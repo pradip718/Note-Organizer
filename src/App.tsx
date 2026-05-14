@@ -16,6 +16,7 @@ export default function App() {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   const activeNote = useMemo(() => 
     notes.find(n => n.id === activeNoteId), 
@@ -72,6 +73,25 @@ export default function App() {
     }
   };
 
+  const handleLogin = async () => {
+    setLoginError(null);
+    try {
+      await loginWithGoogle();
+    } catch (err: any) {
+      console.error("Login error:", err);
+      // Firebase auth error codes
+      if (err.code === 'auth/popup-blocked') {
+        setLoginError("Popup blocked by browser. Please allow popups for this site.");
+      } else if (err.code === 'auth/cancelled-popup-request') {
+        setLoginError("Sign-in was cancelled. Please try again.");
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setLoginError("Sign-in window was closed. Please try again.");
+      } else {
+        setLoginError("An unexpected error occurred during sign-in. Try opening in a new tab.");
+      }
+    }
+  };
+
   if (authLoading || (user && notesLoading)) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#f5f5f5]">
@@ -100,12 +120,22 @@ export default function App() {
             A minimalist, AI-powered space for your thoughts. Synchronized across all your devices securely.
           </p>
           <button 
-            onClick={loginWithGoogle}
+            onClick={handleLogin}
             className="w-full bg-gray-900 text-white px-8 py-4 rounded-2xl font-medium hover:bg-gray-800 transition-all shadow-xl shadow-gray-100 flex items-center justify-center gap-3"
           >
             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/layout/google.svg" alt="Google" className="w-5 h-5 bg-white p-0.5 rounded-full" />
             Continue with Google
           </button>
+          
+          {loginError && (
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mt-6 text-sm text-red-500 font-medium bg-red-50 p-4 rounded-2xl"
+            >
+              {loginError}
+            </motion.p>
+          )}
         </motion.div>
       </div>
     );
