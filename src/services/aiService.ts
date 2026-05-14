@@ -1,9 +1,12 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+export const isAiEnabled = !!GEMINI_API_KEY && GEMINI_API_KEY !== 'undefined' && !GEMINI_API_KEY.includes('MY_GEMINI_API_KEY');
+
+const ai = isAiEnabled ? new GoogleGenAI({ apiKey: GEMINI_API_KEY! }) : null;
 
 export async function generateNoteMetadata(content: string): Promise<{ title: string; tags: string[] }> {
-  if (!content || content.length < 10) return { title: 'New Note', tags: [] };
+  if (!isAiEnabled || !ai || !content || content.length < 10) return { title: 'New Note', tags: [] };
 
   try {
     const response = await ai.models.generateContent({

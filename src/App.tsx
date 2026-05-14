@@ -4,7 +4,7 @@ import { Plus, Search, Tags, Sparkles, Trash2, Clock, ChevronLeft, LogOut, User 
 import { useNotes } from './hooks/useNotes';
 import { cn } from './lib/utils';
 import ReactMarkdown from 'react-markdown';
-import { generateNoteMetadata, summarizeNote } from './services/aiService';
+import { generateNoteMetadata, summarizeNote, isAiEnabled } from './services/aiService';
 import { useAuth } from './contexts/AuthContext';
 import { loginWithGoogle, logout } from './lib/firebase';
 
@@ -280,23 +280,27 @@ export default function App() {
                 </div>
                 
                 <div className="flex items-center gap-2">
-                  <button 
-                    onClick={handleSummarize}
-                    disabled={isAiLoading || !activeNote.content}
-                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-600 rounded-xl transition-all disabled:opacity-50 text-xs md:text-sm font-medium"
-                  >
-                    <Sparkles size={16} className={cn(isAiLoading && "animate-pulse")} />
-                    <span className="hidden sm:inline">Summarize</span>
-                  </button>
-                  <button 
-                    onClick={handleAiRefine}
-                    disabled={isAiLoading || !activeNote.content}
-                    className="bg-gray-900 text-white px-4 py-2 rounded-xl text-xs md:text-sm font-medium flex items-center gap-2 hover:bg-gray-800 transition-all disabled:opacity-50"
-                  >
-                    <Sparkles size={16} className={cn(isAiLoading && "animate-pulse")} />
-                    <span className="hidden sm:inline">AI Refine</span>
-                    <span className="sm:hidden">Refine</span>
-                  </button>
+                  {isAiEnabled && (
+                    <>
+                      <button 
+                        onClick={handleSummarize}
+                        disabled={isAiLoading || !activeNote.content}
+                        className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-600 rounded-xl transition-all disabled:opacity-50 text-xs md:text-sm font-medium"
+                      >
+                        <Sparkles size={16} className={cn(isAiLoading && "animate-pulse")} />
+                        <span className="hidden sm:inline">Summarize</span>
+                      </button>
+                      <button 
+                        onClick={handleAiRefine}
+                        disabled={isAiLoading || !activeNote.content}
+                        className="bg-gray-900 text-white px-4 py-2 rounded-xl text-xs md:text-sm font-medium flex items-center gap-2 hover:bg-gray-800 transition-all disabled:opacity-50"
+                      >
+                        <Sparkles size={16} className={cn(isAiLoading && "animate-pulse")} />
+                        <span className="hidden sm:inline">AI Refine</span>
+                        <span className="sm:hidden">Refine</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
