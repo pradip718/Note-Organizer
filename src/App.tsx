@@ -16,116 +16,113 @@ import { useAuth } from './contexts/AuthContext';
 import { loginWithGoogle, logout } from './lib/firebase';
 import { KanbanCard, KanbanColumn, Note } from './types';
 
-const NoteCard = ({ note, active, onClick, onDelete, index }: any) => {
-  const plainText = useMemo(() => {
-    if (!note.content) return 'Blank page. Begin the inscription...';
-    return note.content
-      .replace(/[#*`~]/g, '') // strip basics
-      .replace(/\[x\]/g, '✓')
-      .replace(/\[ \]/g, '☐')
-      .replace(/^>\s?/gm, '') // strip blockquotes
-      .replace(/^- /gm, '') // strip lists
-      .replace(/^\d+\. /gm, '')
-      .replace(/\n/g, ' ')
-      .trim();
-  }, [note.content]);
+const stripMarkdown = (text: string) => {
+  if (!text) return "";
+  return text
+    .replace(/[#*`~_>]/g, "") // basic markdown symbols
+    .replace(/\[[x ]\]/g, "") // checklists
+    .replace(/[-*]\s/g, "") // bullets
+    .replace(/^\d+\.\s/gm, "") // numbered lists
+    .replace(/\n+/g, " ") // newlines to spaces
+    .trim();
+};
+
+const NoteCard = ({ note, onClick, onDelete }: any) => {
+  const plainText = useMemo(() => stripMarkdown(note.content), [note.content]);
+  const dateFormatted = useMemo(() => {
+    const d = new Date(note.createdAt);
+    const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  }, [note.createdAt]);
 
   return (
-    <motion.div
-      layout
+    <motion.div 
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05 }}
-      className="group relative px-5 overflow-hidden"
+      exit={{ x: -500, transition: { duration: 0.2 } }}
+      layout
+      className="relative w-full group overflow-hidden select-none"
     >
-      {/* Swipe Action Background */}
-      <div className="absolute inset-x-5 inset-y-0 bg-[#c0392b] flex justify-end items-center pr-8 rounded-[32px]">
-         <span className="text-white font-bold text-[11px] tracking-widest uppercase">Delete</span>
+      {/* Delete Zone */}
+      <div 
+        className="absolute inset-y-0 right-0 w-[80px] bg-[#C0392B] flex items-center justify-center rounded-r-[16px] z-0"
+        onClick={() => onDelete(note.id)}
+      >
+        <span className="text-white font-bold text-[11px] tracking-[1px] font-sans">DELETE</span>
       </div>
 
       <motion.div
         drag="x"
-        dragConstraints={{ left: -100, right: 0 }}
-        dragElastic={0.05}
-        onDragEnd={(_, info) => {
-          if (info.offset.x < -70) {
-            onDelete(note.id);
-          }
-        }}
-        className="relative z-10"
+        dragConstraints={{ left: -80, right: 0 }}
+        dragElastic={0.1}
+        dragTransition={{ power: 0.2, timeConstant: 200 }}
+        className="relative z-10 w-full cursor-pointer touch-pan-y"
       >
-        <button
+        <div 
           onClick={onClick}
-          className={cn(
-            "w-full text-left p-5 rounded-[32px] transition-all flex flex-col gap-4 border-l-4 bg-[#0a0a0a]",
-            active 
-              ? "bg-[#161616] border-[#c9a84c] shadow-[0_20px_40px_rgba(0,0,0,0.4)]" 
-              : "hover:bg-[#111111] border-transparent hover:border-white/10"
-          )}
+          className="w-full bg-[#141414] rounded-[16px] border-l-[3px] border-[#C9A84C] p-[20px] transition-colors"
         >
-          <div className="flex items-center justify-between pl-4">
-             <span className="text-[11px] font-mono text-[#c9a84c] tracking-[0.2em] uppercase font-bold">
-              {new Date(note.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-             </span>
-             <div className="flex gap-2 text-[#6b6560]">
-               {note.layout === 'kanban' && <Layout size={14} />}
-               {note.tags.length > 0 && <Tags size={14} />}
-             </div>
+          {/* Row 1: Date */}
+          <div className="text-[#C9A84C] font-sans font-medium text-[11px] tracking-[1.5px] uppercase mb-[10px]">
+            {dateFormatted}
           </div>
-          
-          <h3 className={cn(
-            "text-[17px] font-serif font-bold transition-all line-clamp-1 pl-4",
-            active ? "text-[#f0ebe1]" : "text-[#6b6560] group-hover:text-[#f0ebe1]"
-          )}>
-            {note.title || 'Untitled Thought'}
+
+          {/* Row 2: Title */}
+          <h3 className="font-serif font-bold text-[20px] text-[#F0EBE1] leading-[1.3] mb-[10px] line-clamp-2">
+            {note.title || "Untitled"}
           </h3>
-          
-          <p className="text-[14px] text-[#6b6560] line-clamp-2 leading-[1.6] font-light pl-4">
-            {plainText}
+
+          {/* Row 3: Preview */}
+          <p className={cn(
+            "font-sans font-normal text-[14px] leading-[1.6] line-clamp-2",
+            plainText ? "text-[#6B6560]" : "text-[#3A3A3A] italic"
+          )}>
+            {plainText || "Empty note"}
           </p>
-          
-          {note.tags.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-2 pl-4">
-              {note.tags.map((tag: string) => (
-                <span key={tag} className="text-[11px] uppercase tracking-widest text-[#c9a84c]/40 font-bold border border-[#c9a84c]/10 px-2 py-0.5 rounded-full">
-                  #{tag}
-                </span>
-              ))}
-            </div>
+
+          {/* Row 4: Type Tag */}
+          {(note.layout === 'kanban' || note.layout === 'checklist') && (
+             <div className="mt-[12px] flex">
+               <div className="bg-[#1C1C1C] rounded-[20px] px-[10px] py-[4px] font-sans font-medium text-[11px] text-[#C9A84C] capitalize">
+                 {note.layout}
+               </div>
+             </div>
           )}
-        </button>
+        </div>
       </motion.div>
-      <div className="h-px w-2/3 mx-auto bg-white/5 mt-0 group-last:hidden" />
     </motion.div>
   );
 };
 
 
-const BrandWordmark = () => (
-  <div className="flex flex-col items-start gap-1 group cursor-default">
-    <div className="flex flex-col">
-      <motion.span 
-        initial={{ opacity: 0, tracking: "0.2em" }}
-        animate={{ opacity: 1, tracking: "0.4em" }}
-        className="text-[11px] uppercase font-bold text-[#c9a84c] mb-1"
-      >
+const AppHeader = ({ userName }: { userName: string | null }) => {
+  const initial = userName ? userName.charAt(0).toUpperCase() : "P";
+  
+  return (
+    <header className="pt-[48px] px-[20px] flex flex-col relative w-full mb-[32px]">
+      {/* Line 1 */}
+      <span className="font-sans font-medium text-[11px] text-[#C9A84C] tracking-[2px] uppercase mb-[6px]">
         THE PREMIUM
-      </motion.span>
-      <motion.h1 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="text-[22px] font-serif font-bold tracking-tighter text-[#f0ebe1] flex items-baseline gap-1"
+      </span>
+
+      {/* Line 2 */}
+      <h1 className="font-serif font-bold text-[32px] text-[#F0EBE1] flex items-baseline mb-[8px]">
+        Pradip <span className="italic font-normal text-[#C9A84C] ml-[1px]">Notes</span>
+      </h1>
+
+      {/* Line 3: Thin Line */}
+      <div className="w-full h-[1px] bg-[#C9A84C] opacity-40 mb-[32px]" />
+
+      {/* Avatar */}
+      <div 
+        onClick={logout}
+        className="absolute top-[48px] right-[20px] w-[40px] h-[40px] bg-[#1C1C1C] border border-[#C9A84C]/40 rounded-full flex items-center justify-center cursor-pointer hover:bg-[#2A2A2A] transition-colors"
       >
-        Pradip<span className="italic font-normal text-[#c9a84c]/80">Notes</span>
-      </motion.h1>
-    </div>
-    <motion.div 
-      initial={{ width: 0 }}
-      animate={{ width: "100%" }}
-      className="h-[1px] bg-[#c9a84c]/30"
-    />
-  </div>
-);
+        <span className="font-sans font-semibold text-[16px] text-[#C9A84C]">{initial}</span>
+      </div>
+    </header>
+  );
+};
 
 
 const ToolbarButton = ({ icon: Icon, onClick, active, disabled, label }: any) => (
@@ -409,14 +406,10 @@ export default function App() {
 
   if (authLoading || (user && notesLoading)) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#0a0a0a]">
-        <motion.div 
-          animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
-          transition={{ repeat: Infinity, duration: 3 }}
-          className="w-16 h-16 bg-[#c9a84c] rounded-full blur-[80px]"
-        />
-        <div className="absolute inset-0 flex items-center justify-center">
-           <span className="text-[10px] font-mono tracking-[0.5em] text-[#c9a84c] uppercase font-bold animate-pulse">INITIATING</span>
+      <div className="flex flex-col h-screen items-center justify-center bg-[#0A0A0A] px-[20px]">
+        <div className="flex flex-col items-center gap-[32px]">
+           <div className="w-[64px] h-[64px] rounded-full border-[1px] border-[#C9A84C] border-t-transparent animate-spin opacity-40" />
+           <span className="font-sans font-medium text-[11px] text-[#C9A84C] tracking-[4px] uppercase animate-pulse">INITIATING</span>
         </div>
       </div>
     );
@@ -424,370 +417,154 @@ export default function App() {
 
   if (!user) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#0a0a0a] p-10">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-           <motion.div 
-             animate={{ scale: [1, 1.2, 1], opacity: [0.03, 0.08, 0.03] }}
-             transition={{ duration: 15, repeat: Infinity }}
-             className="absolute -top-1/4 -right-1/4 w-[100vw] h-[100vw] rounded-full bg-[#c9a84c] blur-[200px]"
-           />
-        </div>
+      <div className="flex flex-col min-h-screen bg-[#0A0A0A] px-[20px] pt-[64px] pb-[48px] items-center text-center">
+        {/* Badge */}
+        <span className="font-sans font-medium text-[11px] text-[#C9A84C] tracking-[2px] uppercase mb-[16px]">
+          THE PREMIUM EXPERIENCE
+        </span>
+        
+        {/* Title */}
+        <h1 className="font-serif font-bold text-[48px] text-[#F0EBE1] leading-[1.1] mb-[32px]">
+          Pradip <br />
+          <span className="italic font-normal text-[#C9A84C]">Notes</span>
+        </h1>
 
-        <motion.div 
-          initial={{ y: 30, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          className="max-w-md w-full text-center z-10"
+        {/* Separator */}
+        <div className="w-[48px] h-[1px] bg-[#C9A84C] opacity-40 mb-[32px]" />
+
+        {/* Subtitle */}
+        <p className="font-serif italic text-[20px] text-[#6B6560] leading-[1.6] max-w-[280px] mb-[64px]">
+          "A refined sanctuary for the deliberate mind."
+        </p>
+
+        {/* Login Button */}
+        <button 
+          onClick={handleLogin}
+          className="w-full max-w-[320px] h-[56px] bg-[#F0EBE1] rounded-[12px] flex items-center justify-center gap-[12px] text-[#0A0A0A] font-sans font-bold text-[16px] hover:bg-[#C9A84C] transition-colors active:scale-[0.98] mt-auto"
         >
-          <div className="mb-20">
-            <motion.div 
-              animate={{ rotate: [0, 2, -2, 0], scale: [1, 1.02, 1] }}
-              transition={{ repeat: Infinity, duration: 10 }}
-              className="w-32 h-32 bg-[#111111] rounded-[48px] flex items-center justify-center mx-auto mb-12 shadow-[0_40px_80px_rgba(0,0,0,0.8)] border border-white/5 relative group"
-            >
-              <Sparkles className="text-[#c9a84c]" size={48} />
-              <div className="absolute inset-4 border border-[#c9a84c]/20 rounded-[32px]" />
-            </motion.div>
-            <div className="flex justify-center">
-              <BrandWordmark />
-            </div>
-            <p className="mt-12 text-[#6b6560] leading-relaxed font-light tracking-widest italic font-serif text-lg">
-              "A refined sanctuary for the deliberate mind."
-            </p>
-          </div>
-          
-          <button 
-            onClick={handleLogin}
-            className="w-full bg-[#f0ebe1] text-[#0a0a0a] px-12 py-6 rounded-[32px] font-bold hover:bg-[#c9a84c] transition-all shadow-[0_20px_40px_rgba(201,168,76,0.2)] flex items-center justify-center gap-4 active:scale-95 group"
-          >
-            <UserIcon size={22} className="group-hover:translate-x-1 transition-transform" />
-            ENTER THE SANCTUARY
-          </button>
-          
-          {loginError && (
-            <p className="mt-12 text-[10px] text-[#c0392b] font-bold uppercase tracking-[0.4em] animate-bounce">{loginError}</p>
-          )}
-        </motion.div>
+          <UserIcon size={20} />
+          ENTER THE SANCTUARY
+        </button>
+
+        {loginError && (
+          <p className="mt-[24px] font-sans font-bold text-[11px] text-[#C0392B] uppercase tracking-[2px]">
+            {loginError}
+          </p>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-[#0a0a0a] text-[#f5f5f4] overflow-hidden selection:bg-[#c19a6b] selection:text-[#0a0a0a]">
-      {/* Sidebar - Editorial List */}
-      <AnimatePresence>
-        {showSidebar && (
-          <motion.div 
-            initial={{ x: -400 }}
-            animate={{ x: 0 }}
-            exit={{ x: -400 }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed inset-y-0 left-0 w-full md:w-[400px] md:relative bg-[#0a0a0a] z-50 border-r border-white/5 flex flex-col"
-          >
-            {/* Sidebar Header */}
-            <div className="p-5 pb-4">
-              <div className="flex items-center justify-between mb-8">
-                <BrandWordmark />
-                <button 
-                  onClick={logout}
-                  className="flex items-center gap-2 p-1 pr-3 rounded-full hover:bg-white/5 transition-all group"
-                  title="Sign Out"
-                >
-                  <div className="w-8 h-8 rounded-full bg-[#1c1c1c] flex items-center justify-center text-[#c9a84c] font-bold text-[10px] border border-[#c9a84c]/20">
-                    {user.displayName?.split(' ').map((n: string) => n[0]).join('') || 'A'}
-                  </div>
-                  <LogOut size={14} className="text-[#6b6560] group-hover:text-[#c0392b] transition-all" />
-                </button>
-              </div>
+    <div className="min-h-screen bg-[#0A0A0A] selection:bg-[#C9A84C] selection:text-[#0A0A0A] pb-[64px]">
+      {!activeNote ? (
+        <div className="flex flex-col">
+          <AppHeader userName={user.displayName} />
 
-              <div className="relative mb-5">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#c9a84c]/40" size={16} />
-                <input 
-                  type="text"
-                  placeholder="DISCOVER THOUGHTS..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-[#111111] border border-white/5 rounded-2xl text-[11px] font-mono tracking-[0.2em] uppercase focus:border-[#c9a84c]/50 focus:bg-[#161616] outline-none transition-all placeholder:text-white/10"
+          {/* Search Bar Section */}
+          <div className="px-[20px] mb-[24px]">
+            <div className="bg-[#1C1C1C] border border-[#2A2A2A] rounded-[12px] h-[48px] flex items-center px-[16px] gap-[12px]">
+              {/* Magnifying Glass SVG */}
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B6560" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input 
+                type="text"
+                placeholder="DISCOVER THOUGHTS..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-transparent border-none outline-none w-full font-sans font-normal text-[15px] text-[#F0EBE1] placeholder:text-[#3A3A3A] placeholder:font-medium placeholder:text-[12px] placeholder:tracking-[1.5px]"
+              />
+            </div>
+          </div>
+
+          {/* Note List Section */}
+          <div className="px-[20px] flex flex-col gap-[16px]">
+            <AnimatePresence initial={false}>
+              {filteredNotes.map((note) => (
+                <NoteCard
+                  key={note.id}
+                  note={note}
+                  onClick={() => setActiveNoteId(note.id)}
+                  onDelete={handleDeleteNote}
                 />
-              </div>
-
-              {allTags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {allTags.map(tag => (
-                    <button 
-                      key={tag}
-                      onClick={() => setSelectedTag(tag === selectedTag ? null : tag)}
-                      className={cn(
-                        "px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border",
-                        selectedTag === tag 
-                          ? "bg-[#c9a84c] text-[#0a0a0a] border-[#c9a84c]" 
-                          : "bg-transparent text-[#6b6560] border-white/5 hover:border-white/10 hover:text-[#f0ebe1]"
-                      )}
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Note List */}
-            <div className="flex-1 overflow-y-auto px-5 pb-20 no-scrollbar space-y-2">
-              <AnimatePresence initial={false}>
-                {filteredNotes.map((note, idx) => (
-                  <NoteCard
-                    key={note.id}
-                    note={note}
-                    index={idx}
-                    active={activeNoteId === note.id}
-                    onClick={() => {
-                      setActiveNoteId(note.id);
-                      if (window.innerWidth < 768) setShowSidebar(false);
-                    }}
-                    onDelete={handleDeleteNote}
-                  />
-                ))}
-              </AnimatePresence>
-              
-              {filteredNotes.length === 0 && (
-                <div className="py-20 text-center opacity-10 font-serif italic text-2xl">
-                  <p>Silent void.</p>
-                </div>
-              )}
-            </div>
-
-            {/* Subtle Sidebar Footer */}
-            <div className="p-8 border-t border-white/5 opacity-40 hover:opacity-100 transition-opacity">
-               <p className="text-[11px] font-mono tracking-widest text-center">{user.email}</p>
-            </div>
-          </motion.div>
-
-        )}
-      </AnimatePresence>
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col h-full bg-[#0a0a0a] relative">
-        {activeNote ? (
-          <div className="flex-1 flex flex-col h-full relative">
-            {/* Sticky Header / Toolbar */}
-            <motion.header 
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={cn(
-                "z-40 px-5 md:px-[20px] py-8 border-b border-white/5 bg-[#0a0a0a]/90 backdrop-blur-3xl flex items-center justify-between sticky top-0"
-              )}
-            >
-              <div className="flex items-center gap-6">
-                <button 
-                  onClick={() => setShowSidebar(true)}
-                  className="p-4 hover:bg-white/5 rounded-3xl text-[#6b6560] transition-all active:scale-90"
-                >
-                  <ChevronLeft size={24} />
-                </button>
-                <div className="hidden md:flex flex-col">
-                  <span className="text-[11px] font-mono tracking-[0.3em] text-[#c9a84c] uppercase font-bold">SEQUENCE #{activeNote.id.slice(-6)}</span>
-                  <div className="flex items-center gap-2 text-[#6b6560]">
-                    <Clock size={12} />
-                    <span className="text-[11px] font-serif italic tracking-wide">Revised {new Date(activeNote.updatedAt).toLocaleTimeString()}</span>
-                  </div>
-                </div>
-              </div>
-
-               <div className="absolute left-1/2 -translate-x-1/2 hidden lg:block">
-                 <h2 className="text-[11px] font-serif font-bold tracking-widest uppercase text-[#f0ebe1]/40 line-clamp-1 max-w-[200px]">
-                   {activeNote.title || 'Untitled'}
-                 </h2>
-              </div>
-
-              <div className="flex items-center gap-4 px-[20px]">
-                <button 
-                  onClick={logout}
-                  className="hidden md:flex items-center gap-2 p-1 pr-3 rounded-full hover:bg-white/5 transition-all group"
-                  title="Sign Out"
-                >
-                  <div className="w-8 h-8 rounded-full bg-[#1c1c1c] flex items-center justify-center text-[#c9a84c] font-bold text-[10px] border border-[#c9a84c]/20">
-                    {user.displayName?.split(' ').map((n: string) => n[0]).join('') || 'A'}
-                  </div>
-                </button>
-                
-                <button className="p-4 hover:bg-white/5 rounded-2xl text-[#6b6560] transition-all group relative">
-                  <Menu size={20} />
-                  <div className="absolute top-full right-0 mt-4 w-48 bg-[#141414] border border-white/10 rounded-2xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden">
-                    <button onClick={handleSummarize} className="w-full text-left px-5 py-4 hover:bg-white/5 text-[11px] font-bold uppercase tracking-widest flex items-center gap-3">
-                      <Sparkles size={14} /> AI Synthesis
-                    </button>
-                    <button onClick={() => handleDeleteNote(activeNote.id)} className="w-full text-left px-5 py-4 hover:bg-[#c0392b]/10 text-[#c0392b] text-[11px] font-bold uppercase tracking-widest flex items-center gap-3">
-                      <Trash2 size={14} /> Expunge Note
-                    </button>
-                  </div>
-                </button>
-              </div>
-            </motion.header>
-
-
-            {/* Floating Editor Toolbar (Bottom) */}
-            <AnimatePresence>
-              {isEditing && (
-                <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[60] px-5 w-full max-w-2xl">
-                   <motion.div 
-                     initial={{ y: 50, opacity: 0 }}
-                     animate={{ y: 0, opacity: 1 }}
-                     exit={{ y: 50, opacity: 0 }}
-                     className="bg-[#111111]/90 backdrop-blur-2xl p-2 rounded-[32px] border border-white/10 shadow-[0_30px_60px_rgba(0,0,0,0.6)] flex items-center justify-between gap-2 overflow-x-auto no-scrollbar"
-                   >
-                     <div className="flex items-center gap-1">
-                        <ToolbarButton icon={Bold} label="Bold" onClick={() => updateNote(activeNote.id, { content: activeNote.content + '**Text**' })} />
-                        <ToolbarButton icon={Type} label="H1" onClick={() => updateNote(activeNote.id, { content: activeNote.content + '\n# ' })} />
-                        <ToolbarButton icon={Quote} label="Quote" onClick={() => updateNote(activeNote.id, { content: activeNote.content + '\n> ' })} />
-                     </div>
-                     
-                     <div className="h-6 w-px bg-white/10 mx-1" />
-                     
-                     <div className="flex items-center gap-1">
-                        <ToolbarButton icon={List} label="Bullets" onClick={() => updateNote(activeNote.id, { content: activeNote.content + '\n- ' })} />
-                        <ToolbarButton icon={CheckSquare} label="Tasks" onClick={() => updateNote(activeNote.id, { content: activeNote.content + '\n- [ ] ' })} />
-                     </div>
-
-                     <div className="h-6 w-px bg-white/10 mx-1" />
-
-                     <div className="flex items-center gap-1">
-                        <ToolbarButton 
-                          icon={Layout} 
-                          active={activeNote.layout === 'kanban'} 
-                          label="Kanban Layout" 
-                          onClick={() => updateNote(activeNote.id, { layout: activeNote.layout === 'kanban' ? 'standard' : 'kanban' })} 
-                        />
-                        {isAiEnabled && (
-                          <button 
-                            onClick={handleAiRefine}
-                            disabled={isAiLoading || !activeNote.content}
-                            className={cn(
-                              "p-2.5 rounded-xl transition-all flex items-center justify-center min-w-[44px] h-[44px]",
-                              isAiLoading ? "bg-[#c9a84c] text-[#0a0a0a]" : "text-[#c9a84c] hover:bg-[#c9a84c]/10"
-                            )}
-                          >
-                            <Sparkles size={20} className={cn(isAiLoading && "animate-spin")} />
-                          </button>
-                        )}
-                     </div>
-                   </motion.div>
-                </div>
-              )}
+              ))}
             </AnimatePresence>
 
-            {/* Editor Body */}
-            <main className="flex-1 overflow-y-auto no-scrollbar pb-60 shadow-inner">
-              <div className="max-w-6xl mx-auto px-5 md:px-[24px] py-16">
-                <textarea 
-                  rows={1}
-                  value={activeNote.title}
-                  onChange={(e) => {
-                    updateNote(activeNote.id, { title: e.target.value });
-                    e.target.style.height = 'auto';
-                    e.target.style.height = e.target.scrollHeight + 'px';
-                  }}
-                  onBlur={(e) => e.target.style.height = 'auto'}
-                  placeholder="The Inscription Title..."
-                  className="w-full text-[34px] font-serif font-bold bg-transparent border-none outline-none mb-4 placeholder:opacity-5 selection:bg-[#c9a84c] selection:text-[#0a0a0a] resize-none overflow-hidden"
-                />
-
-                {activeNote.layout === 'kanban' ? (
-                  <KanbanBoard note={activeNote} onUpdate={(u) => updateNote(activeNote.id, u)} />
-                ) : (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
-                    <div className="flex flex-col min-h-[60vh]">
-                      {!isEditing && activeNote.content ? (
-                        <div 
-                          onClick={() => setIsEditing(true)}
-                          className="prose-editorial prose-invert cursor-text"
-                        >
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{activeNote.content}</ReactMarkdown>
-                        </div>
-                      ) : (
-                        <textarea 
-                          autoFocus={isEditing}
-                          value={activeNote.content}
-                          onFocus={() => setIsEditing(true)}
-                          onBlur={(e) => {
-                             // Only stop editing if we didn't just click something else important
-                             if (!e.relatedTarget) setIsEditing(false);
-                          }}
-                          onChange={(e) => updateNote(activeNote.id, { content: e.target.value })}
-                          placeholder="Begin your next legacy here..."
-                          className="w-full flex-1 bg-transparent border-none outline-none text-[14px] md:text-[17px] leading-[1.8] text-[#f0ebe1]/90 font-light resize-none placeholder:italic placeholder:opacity-5 serif"
-                        />
-                      )}
-                    </div>
-                    <div className="hidden lg:block border-l border-white/5 pl-16 prose-editorial">
-                      <div className="sticky top-12">
-                        <span className="text-[11px] font-mono tracking-[0.4em] text-[#c9a84c] uppercase block mb-8 font-bold">SYNTHESIS</span>
-                        <div className="opacity-90">
-                          {activeNote.content ? (
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{activeNote.content}</ReactMarkdown>
-                          ) : (
-                            <div className="space-y-4 opacity-5">
-                               <div className="h-4 w-full bg-[#f0ebe1] rounded-full" />
-                               <div className="h-4 w-5/6 bg-[#f0ebe1] rounded-full" />
-                               <div className="h-4 w-4/6 bg-[#f0ebe1] rounded-full" />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
+            {filteredNotes.length === 0 && (
+              <div className="py-[64px] text-center">
+                <p className="font-serif italic text-[18px] text-[#3A3A3A]">Silent void.</p>
               </div>
-            </main>
-
+            )}
           </div>
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center p-12 relative overflow-hidden">
-              <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-                <motion.div 
-                   animate={{ scale: [1, 1.1, 1], opacity: [0.03, 0.06, 0.03] }}
-                   transition={{ duration: 12, repeat: Infinity }}
-                   className="absolute -top-1/4 -right-1/4 w-[90vw] h-[90vw] rounded-full bg-[#c9a84c] blur-[180px]"
-                 />
-              </div>
 
-              <motion.div 
-                initial={{ opacity: 0, y: 40 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="max-w-2xl text-center z-10"
+          {/* Create Button (FAB) */}
+          <button
+            onClick={handleCreateNote}
+            className="fixed bottom-[32px] right-[20px] w-[64px] h-[64px] bg-[#C9A84C] rounded-full shadow-[0_16px_32px_rgba(0,0,0,0.6)] flex items-center justify-center text-[#0A0A0A] active:scale-95 transition-transform z-50 border-none"
+            title="Create Note"
+          >
+            <Plus size={32} />
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col h-screen">
+          {/* Editor Header */}
+          <header className="h-[64px] px-[20px] flex items-center justify-between border-b border-[#C9A84C]/20 shrink-0">
+            <button 
+              onClick={() => setActiveNoteId(null)}
+              className="w-[48px] h-[48px] flex items-center justify-start text-[#C9A84C]"
+            >
+              <ChevronLeft size={24} />
+            </button>
+            <h2 className="font-serif font-bold text-[18px] text-[#F0EBE1] truncate max-w-[200px]">
+              {activeNote.title || "Untitled"}
+            </h2>
+            <button 
+              onClick={() => handleDeleteNote(activeNote.id)}
+              className="w-[48px] h-[48px] flex items-center justify-end text-[#C0392B]"
+            >
+              <Trash2 size={20} />
+            </button>
+          </header>
+
+          <main className="flex-1 overflow-y-auto p-[20px] no-scrollbar">
+            <input 
+              value={activeNote.title}
+              onChange={(e) => updateNote(activeNote.id, { title: e.target.value })}
+              placeholder="Title"
+              className="w-full bg-transparent border-none outline-none font-serif font-bold text-[32px] text-[#F0EBE1] mb-[20px]"
+            />
+            
+            {activeNote.layout === 'kanban' ? (
+              <KanbanBoard note={activeNote} onUpdate={(u) => updateNote(activeNote.id, u)} />
+            ) : (
+              <textarea 
+                value={activeNote.content}
+                onChange={(e) => updateNote(activeNote.id, { content: e.target.value })}
+                placeholder="Begin your thoughts..."
+                className="w-full h-[60vh] bg-transparent border-none outline-none font-sans font-normal text-[17px] leading-[1.8] text-[#F0EBE1] resize-none"
+              />
+            )}
+          </main>
+
+          {/* Editor Toolbar */}
+          <div className="h-[64px] bg-[#1C1C1C] border-t border-white/5 flex items-center px-[20px] gap-[16px] overflow-x-auto no-scrollbar shrink-0">
+            <ToolbarButton icon={Bold} onClick={() => updateNote(activeNote.id, { content: activeNote.content + "**Text**" })} />
+            <ToolbarButton icon={List} onClick={() => updateNote(activeNote.id, { content: activeNote.content + "\n- " })} />
+            {isAiEnabled && (
+              <button 
+                onClick={handleAiRefine}
+                disabled={isAiLoading}
+                className="ml-auto bg-[#C9A84C]/10 text-[#C9A84C] px-[16px] py-[8px] rounded-[8px] text-[12px] font-bold tracking-[1px] font-sans"
               >
-                 <BrandWordmark />
-                 <h2 className="text-5xl font-serif font-bold mt-16 mb-8 text-[#f0ebe1]">Begin Your Next Sequence</h2>
-                 <p className="text-[#6b6560] font-light leading-[1.8] mb-16 italic font-serif text-xl px-10">
-                   Capture fleeting brilliance, coordinate complex maneuvers, and refine them into lasting legacy. Your sanctuary for deliberate thought awaits.
-                 </p>
-                 <button 
-                   onClick={handleCreateNote}
-                   className="px-16 py-6 bg-[#f0ebe1] text-[#0a0a0a] rounded-[32px] font-bold hover:bg-[#c9a84c] transition-all flex items-center gap-4 mx-auto active:scale-95 shadow-[0_30px_60px_rgba(0,0,0,0.4)] group"
-                 >
-                   <Plus size={24} className="group-hover:rotate-90 transition-transform duration-300" /> 
-                   NEW INSCRIPTION
-                 </button>
-              </motion.div>
+                {isAiLoading ? "REFINING..." : "AI REFINE"}
+              </button>
+            )}
           </div>
-        )}
-      </div>
-
-      {/* FAB for Mobile */}
-      <motion.button
-        initial={{ scale: 0, rotate: -45 }}
-        animate={{ scale: 1, rotate: 0 }}
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-        onClick={handleCreateNote}
-        className="fixed bottom-[24px] right-[20px] w-20 h-20 bg-[#c9a84c] rounded-[32px] shadow-[0_30px_60px_rgba(201,168,76,0.5)] z-[70] flex items-center justify-center text-[#0a0a0a] active:scale-95 group transition-all"
-      >
-        <Plus size={32} className="group-hover:rotate-90 transition-transform duration-500" />
-        <motion.div 
-          animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
-          transition={{ duration: 4, repeat: Infinity }}
-          className="absolute inset-0 border-4 border-[#c9a84c]/30 rounded-[32px] pointer-events-none"
-        />
-      </motion.button>
+        </div>
+      )}
 
       {/* Undo Toast */}
       <AnimatePresence>
@@ -796,12 +573,12 @@ export default function App() {
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-[24px] left-1/2 -translate-x-1/2 z-[100] bg-[#111111] border border-white/10 px-8 py-4 rounded-full shadow-2xl flex items-center gap-6"
+            className="fixed bottom-[32px] left-[20px] right-[20px] z-[100] bg-[#1C1C1C] rounded-[12px] p-[14px_20px] flex items-center justify-between shadow-[0_20px_40px_rgba(0,0,0,0.5)] border border-white/5"
           >
-            <span className="text-[#6b6560] text-[11px] font-bold uppercase tracking-widest">Note Expunged</span>
+            <span className="text-[#F0EBE1] font-sans text-[14px]">Note deleted</span>
             <button 
               onClick={handleUndo}
-              className="text-[#c9a84c] text-[11px] font-bold uppercase tracking-[0.2em] hover:underline"
+              className="text-[#C9A84C] font-sans font-bold text-[14px] uppercase tracking-[1px]"
             >
               Undo
             </button>
@@ -810,5 +587,6 @@ export default function App() {
       </AnimatePresence>
     </div>
   );
+
 }
 
