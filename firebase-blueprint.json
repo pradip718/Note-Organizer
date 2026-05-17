@@ -21,6 +21,15 @@
           "type": "array",
           "description": "List of tags"
         },
+        "layout": {
+          "type": "string",
+          "description": "Preferred layout (standard or kanban)",
+          "enum": ["standard", "kanban"]
+        },
+        "kanbanData": {
+          "type": "object",
+          "description": "Data for kanban layout"
+        },
         "updatedAt": {
           "type": "number",
           "description": "Timestamp of last update"

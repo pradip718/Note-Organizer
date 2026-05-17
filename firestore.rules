@@ -30,11 +30,11 @@ service cloud.firestore {
     // Entity Validations
     function isValidNote(data) {
       return data.keys().hasAll(['userId', 'title', 'content', 'tags', 'updatedAt', 'createdAt']) &&
-             data.keys().size() == 6 &&
              data.userId == request.auth.uid &&
              data.title is string && data.title.size() <= 500 &&
-             data.content is string && data.content.size() <= 50000 &&
-             data.tags is list && data.tags.size() <= 10 &&
+             data.content is string && data.content.size() <= 100000 &&
+             data.tags is list && data.tags.size() <= 20 &&
+             (!data.keys().contains('layout') || data.layout in ['standard', 'kanban']) &&
              data.updatedAt is number &&
              data.createdAt is number;
     }
@@ -50,7 +50,7 @@ service cloud.firestore {
       
       allow update: if isOwner(existing()) && isValidNote(incoming()) && (
         // Action: Content Update
-        incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'tags', 'updatedAt']) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'tags', 'updatedAt', 'layout', 'kanbanData']) &&
         incoming().createdAt == existing().createdAt &&
         incoming().userId == existing().userId
       );
